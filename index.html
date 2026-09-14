@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Посмотри мем</title>
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.1s ease; cursor: pointer; }
+        img:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+    <img id="memeImg" src="meme.jpg" alt="Мем">
+    <audio id="prankSound" src="sound.mp3" preload="auto" loop></audio>
+
+    <script>
+        // ==== ВСТАВЬ СВОИ ДАННЫЕ ====
+        const USER = 'anrevlx';
+        const REPO = 'nfcprank';
+        const BRANCH = 'main';
+        // ============================
+
+        const audio = document.getElementById('prankSound');
+        const img = document.getElementById('memeImg');
+        let unlocked = false;
+        let lastTs = 0;
+
+        // Разблокировка звука по тапу
+        img.addEventListener('click', () => {
+            if (unlocked) return;
+            audio.muted = true;
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                audio.muted = false;
+                unlocked = true;
+            }).catch(()=>{});
+        });
+
+        // Проверка сигнала
+        async function checkSignal() {
+            try {
+                const url = `https://raw.githubusercontent.com/${USER}/${REPO}/${BRANCH}/signal.json?t=${Date.now()}`;
+                const r = await fetch(url, { cache: 'no-store' });
+                const data = await r.json();
+                if (data.play === true && data.ts !== lastTs) {
+                    lastTs = data.ts;
+                    audio.currentTime = 0;
+                    audio.play().catch(()=>{});
+                }
+            } catch(e) {}
+        }
+
+        setInterval(checkSignal, 1000);
+
+        // Стоп при сворачивании вкладки / блокировке
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                audio.pause();
+            }
+        });
+    </script>
+</body>
+</html>

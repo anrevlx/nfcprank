@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пульт</title>
+    <style>
+        body { display: flex; flex-direction: column; gap: 20px; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; background: #111; color: #eee; }
+        button { padding: 30px 60px; font-size: 28px; background: #ff3b30; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; }
+        button:active { transform: scale(0.97); }
+        .status { font-size: 14px; color: #888; }
+        .status.online { color: #4cd964; }
+        .status.error { color: #ff3b30; }
+    </style>
+</head>
+<body>
+
+    <button id="btn">DETONATE 💥</button>
+    <div class="status" id="status">ready</div>
+
+    <script>
+        // ==== ВСТАВЬ СВОИ ДАННЫЕ ====
+        const USER = 'anrevlx';
+        const REPO = 'nfcprank';
+        const BRANCH = 'main';
+        const TOKEN = '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'; // твой Personal Access Token
+        // ============================
+
+        const status = document.getElementById('status');
+
+        async function getFileSha() {
+            const url = `https://api.github.com/repos/${USER}/${REPO}/contents/signal.json?ref=${BRANCH}`;
+            const r = await fetch(url, {
+                headers: { 'Authorization': `token ${TOKEN}` }
+            });
+            const data = await r.json();
+            return data.sha;
+        }
+
+        async function writeSignal(play) {
+            const sha = await getFileSha();
+            const content = btoa(JSON.stringify({ play, ts: Date.now() }));
+            const url = `https://api.github.com/repos/${USER}/${REPO}/contents/signal.json`;
+            const r = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `signal ${play}`,
+                    content: content,
+                    sha: sha,
+                    branch: BRANCH
+                })
+            });
+            return r.ok;
+        }
+
+        document.getElementById('btn').addEventListener('click', async () => {
+            status.textContent = 'sending...';
+            status.className = 'status';
+            try {
+                const ok = await writeSignal(true);
+                if (ok) {
+                    status.textContent = 'sent 💥';
+                    status.classList.add('online');
+                    setTimeout(() => writeSignal(false), 3000);
+                } else {
+                    status.textContent = 'write error';
+                    status.classList.add('error');
+                }
+            } catch(e) {
+                status.textContent = 'error: ' + e.message;
+                status.classList.add('error');
+            }
+        });
+    </script>
+</body>
+</html>
