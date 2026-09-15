@@ -58,6 +58,7 @@
             const token = getToken();
             if (!token) throw new Error('нет токена');
             const r = await fetch(url, {
+                cache: 'no-store',
                 ...options,
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -81,20 +82,32 @@
             return data.sha;
         }
 
-        async function writeSignal(play) {
+        function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+        async function writeSignal(play, attempt = 1) {
             const sha = await getFileSha();
             const content = btoa(JSON.stringify({ play, ts: Date.now() }));
             const url = `https://api.github.com/repos/${USER}/${REPO}/contents/signal.json`;
-            await githubRequest(url, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: `signal ${play}`,
-                    content: content,
-                    sha: sha,
-                    branch: BRANCH
-                })
-            });
+            try {
+                await githubRequest(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: `signal ${play}`,
+                        content: content,
+                        sha: sha,
+                        branch: BRANCH
+                    })
+                });
+            } catch (e) {
+                // конфликт версий (409) — GitHub иногда чуть отстаёт после быстрой
+                // записи подряд. Пробуем ещё несколько раз с небольшой паузой.
+                if (e.message.startsWith('409') && attempt < 4) {
+                    await sleep(400 * attempt);
+                    return writeSignal(play, attempt + 1);
+                }
+                throw e;
+            }
             return true;
         }
 
