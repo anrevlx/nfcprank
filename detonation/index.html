@@ -1,3 +1,10 @@
+<!--
+  КУДА КЛАСТЬ ЭТОТ ФАЙЛ:
+  В папку detonation, файл называется index.html
+  Путь получается: detonation/index.html
+  (заменить текущий detonation/index.html на этот)
+  Это пульт с кнопками DETONATE и STOP — открываешь только ты сам.
+-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -16,6 +23,7 @@
 <body>
 
     <button id="btn">DETONATE 💥</button>
+    <button id="stopBtn" style="background:#3a3a3c;">STOP ⏹</button>
     <div class="status" id="status">ready</div>
     <a href="#" id="resetToken" style="font-size:12px;color:#666;">сменить токен</a>
 
@@ -95,11 +103,21 @@
             status.className = 'status';
             try {
                 await writeSignal(true);
-                status.textContent = 'sent 💥';
+                status.textContent = 'sent 💥 (играет)';
                 status.classList.add('online');
-                setTimeout(async () => {
-                    try { await writeSignal(false); } catch(e) {}
-                }, 3000);
+            } catch(e) {
+                status.textContent = 'error: ' + e.message;
+                status.classList.add('error');
+            }
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', async () => {
+            status.textContent = 'stopping...';
+            status.className = 'status';
+            try {
+                await writeSignal(false);
+                status.textContent = 'stopped';
+                status.classList.add('online');
             } catch(e) {
                 status.textContent = 'error: ' + e.message;
                 status.classList.add('error');
