@@ -1,3 +1,9 @@
+<!--
+  КУДА КЛАСТЬ ЭТОТ ФАЙЛ:
+  В КОРЕНЬ репозитория, файл называется index.html
+  (то есть просто заменить твой текущий index.html в корне на этот)
+  Это страница-жертва — та, что открывается по ссылке из NFC-метки.
+-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -67,11 +73,16 @@
                 const url = `https://raw.githubusercontent.com/${USER}/${REPO}/${BRANCH}/signal.json?t=${Date.now()}`;
                 const r = await fetch(url, { cache: 'no-store' });
                 const data = await r.json();
-                if (data.play === true && data.ts !== lastTs) {
+                if (data.ts !== lastTs) {
                     lastTs = data.ts;
-                    playSound();
-                    if (navigator.vibrate) {
-                        navigator.vibrate([300, 100, 300, 100, 300, 100, 600]);
+                    if (data.play === true) {
+                        playSound();
+                        if (navigator.vibrate) {
+                            navigator.vibrate([300, 100, 300, 100, 300, 100, 600]);
+                        }
+                    } else {
+                        stopSound();
+                        if (navigator.vibrate) navigator.vibrate(0);
                     }
                 }
             } catch(e) {}
