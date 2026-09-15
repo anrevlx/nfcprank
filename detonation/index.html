@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пульт</title>
+    <style>
+        body { display: flex; flex-direction: column; gap: 20px; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; background: #111; color: #eee; }
+        button { padding: 30px 60px; font-size: 28px; background: #ff3b30; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; }
+        button:active { transform: scale(0.97); }
+        .status { font-size: 14px; color: #888; }
+        .status.online { color: #4cd964; }
+        .status.error { color: #ff3b30; }
+    </style>
+</head>
+<body>
+
+    <button id="btn">DETONATE 💥</button>
+    <div class="status" id="status">ready</div>
+    <a href="#" id="resetToken" style="font-size:12px;color:#666;">сменить токен</a>
+
+    <script>
+        // ==== настройки репозитория (это НЕ секрет, можно светить) ====
+        const USER = 'anrevlx';
+        const REPO = 'nfcprank';
+        const BRANCH = 'main';
+        // Токен НЕ хранится в коде. Спрашиваем один раз и кладём в localStorage
+        // этого конкретного браузера/телефона — в публичный репозиторий он не попадает.
+        // ================================================================
+
+        const status = document.getElementById('status');
+
+        function getToken() {
+            let token = localStorage.getItem('gh_token');
+            if (!token) {
+                token = prompt('Вставь GitHub Personal Access Token (Fine-grained, права Contents: Read and write на репо ' + REPO + '):');
+                if (token) localStorage.setItem('gh_token', token.trim());
+            }
+            return token;
+        }
+
+        document.getElementById('resetToken').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('gh_token');
+            status.textContent = 'токен сброшен, нажми DETONATE чтобы ввести новый';
+            status.className = 'status';
+        });
+
+        async function githubRequest(url, options = {}) {
+            const token = getToken();
+            if (!token) throw new Error('нет токена');
+            const r = await fetch(url, {
+                ...options,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    ...(options.headers || {})
+                }
+            });
+            if (r.status === 401) {
+                localStorage.removeItem('gh_token'); // токен плохой/отозван — сбрасываем, чтобы спросить заново
+                throw new Error('401: токен неверный или отозван GitHub-ом (публичный репо!)');
+            }
+            if (!r.ok) {
+                const body = await r.text();
+                throw new Error(`${r.status}: ${body.slice(0, 150)}`);
+            }
+            return r.json();
+        }
+
+        async function getFileSha() {
+            const url = `https://api.github.com/repos/${USER}/${REPO}/contents/signal.json?ref=${BRANCH}`;
+            const data = await githubRequest(url);
+            return data.sha;
+        }
+
+        async function writeSignal(play) {
+            const sha = await getFileSha();
+            const content = btoa(JSON.stringify({ play, ts: Date.now() }));
+            const url = `https://api.github.com/repos/${USER}/${REPO}/contents/signal.json`;
+            await githubRequest(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: `signal ${play}`,
+                    content: content,
+                    sha: sha,
+                    branch: BRANCH
+                })
+            });
+            return true;
+        }
+
+        document.getElementById('btn').addEventListener('click', async () => {
+            status.textContent = 'sending...';
+            status.className = 'status';
+            try {
+                await writeSignal(true);
+                status.textContent = 'sent 💥';
+                status.classList.add('online');
+                setTimeout(async () => {
+                    try { await writeSignal(false); } catch(e) {}
+                }, 3000);
+            } catch(e) {
+                status.textContent = 'error: ' + e.message;
+                status.classList.add('error');
+            }
+        });
+    </script>
+</body>
+</html>
