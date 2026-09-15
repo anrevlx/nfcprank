@@ -13,7 +13,6 @@
 <body>
 
     <img id="memeImg" src="meme.jpg" alt="Мем">
-    <audio id="prankSound" src="sound.mp3" preload="auto" loop></audio>
 
     <script>
         // ==== ВСТАВЬ СВОИ ДАННЫЕ ====
@@ -22,22 +21,45 @@
         const BRANCH = 'main';
         // ============================
 
-        const audio = document.getElementById('prankSound');
         const img = document.getElementById('memeImg');
+        let audioCtx = null;
+        let audioBuffer = null;
+        let currentSource = null;
         let unlocked = false;
         let lastTs = 0;
 
-        // Разблокировка звука по тапу
-        img.addEventListener('click', () => {
+        // Разблокировка звука по тапу: по-настоящему "прогреваем" AudioContext
+        // и загружаем звук в память. После этого браузер разрешает запускать
+        // его позже без нового тапа — в отличие от обычного <audio>.
+        img.addEventListener('click', async () => {
             if (unlocked) return;
-            audio.muted = true;
-            audio.play().then(() => {
-                audio.pause();
-                audio.currentTime = 0;
-                audio.muted = false;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const response = await fetch('sound.mp3');
+                const arrayBuffer = await response.arrayBuffer();
+                audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                await audioCtx.resume();
                 unlocked = true;
-            }).catch(()=>{});
+            } catch(e) {}
         });
+
+        function playSound() {
+            if (!audioCtx || !audioBuffer) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            stopSound();
+            currentSource = audioCtx.createBufferSource();
+            currentSource.buffer = audioBuffer;
+            currentSource.loop = true;
+            currentSource.connect(audioCtx.destination);
+            currentSource.start(0);
+        }
+
+        function stopSound() {
+            if (currentSource) {
+                try { currentSource.stop(); } catch(e) {}
+                currentSource = null;
+            }
+        }
 
         // Проверка сигнала
         async function checkSignal() {
@@ -47,8 +69,7 @@
                 const data = await r.json();
                 if (data.play === true && data.ts !== lastTs) {
                     lastTs = data.ts;
-                    audio.currentTime = 0;
-                    audio.play().catch(()=>{});
+                    playSound();
                     if (navigator.vibrate) {
                         navigator.vibrate([300, 100, 300, 100, 300, 100, 600]);
                     }
@@ -61,7 +82,7 @@
         // Стоп при сворачивании вкладки / блокировке
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                audio.pause();
+                stopSound();
                 if (navigator.vibrate) navigator.vibrate(0);
             }
         });
